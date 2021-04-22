@@ -19,6 +19,7 @@ import static org.casbin.jcasbin.util.Util.splitCommaDelimited;
 import org.casbin.jcasbin.config.Config;
 import org.casbin.jcasbin.util.Util;
 
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -65,6 +66,7 @@ public class Model extends Policy {
         Assertion ast = new Assertion();
         ast.key = key;
         ast.value = value;
+        ast.initPriorityIndex();
 
         if (ast.value.equals("")) {
             return false;
@@ -72,8 +74,12 @@ public class Model extends Policy {
 
         if (sec.equals("r") || sec.equals("p")) {
             ast.tokens = splitCommaDelimited(ast.value);
-            for (int i = 0; i < ast.tokens.length; i ++) {
+            for (int i = 0; i < ast.tokens.length; i++) {
                 ast.tokens[i] = key + "_" + ast.tokens[i];
+
+                if ("p_priority".equals(ast.tokens[i])) {
+                    ast.priorityIndex = i;
+                }
             }
         } else {
             ast.value = Util.removeComments(Util.escapeAssertion(ast.value));
@@ -107,6 +113,20 @@ public class Model extends Policy {
         }
     }
 
+    /*
+     * Helper function for loadModel and loadModelFromText
+     * 
+     * @param config the configuration parser
+     */
+    private void loadSections(Config cfg) {
+        loadSection(this, cfg, "r");
+        loadSection(this, cfg, "p");
+        loadSection(this, cfg, "e");
+        loadSection(this, cfg, "m");
+
+        loadSection(this, cfg, "g");
+    }
+    
     /**
      * loadModel loads the model from model CONF file.
      *
@@ -115,12 +135,7 @@ public class Model extends Policy {
     public void loadModel(String path) {
         Config cfg = Config.newConfig(path);
 
-        loadSection(this, cfg, "r");
-        loadSection(this, cfg, "p");
-        loadSection(this, cfg, "e");
-        loadSection(this, cfg, "m");
-
-        loadSection(this, cfg, "g");
+        loadSections(cfg);
     }
 
     /**
@@ -131,12 +146,7 @@ public class Model extends Policy {
     public void loadModelFromText(String text) {
         Config cfg = Config.newConfigFromText(text);
 
-        loadSection(this, cfg, "r");
-        loadSection(this, cfg, "p");
-        loadSection(this, cfg, "e");
-        loadSection(this, cfg, "m");
-
-        loadSection(this, cfg, "g");
+        loadSections(cfg);
     }
 
     /**
@@ -195,6 +205,24 @@ public class Model extends Policy {
             for (Map.Entry<String, Assertion> entry2 : entry.getValue().entrySet()) {
                 Util.logPrintf("%s.%s: %s", entry.getKey(), entry2.getKey(), entry2.getValue().value);
             }
+        }
+    }
+
+    /**
+     * sort policies by priority value
+     */
+    public void sortPoliciesByPriority() {
+        if (!model.containsKey("p")) {
+            return;
+        }
+
+        for (Map.Entry<String, Assertion> entry : model.get("p").entrySet()) {
+            Assertion assertion = entry.getValue();
+            int priorityIndex = assertion.priorityIndex;
+            if (priorityIndex < 0) {
+                continue;
+            }
+            assertion.policy.sort(Comparator.comparingInt(p -> Integer.parseInt(p.get(priorityIndex))));
         }
     }
 

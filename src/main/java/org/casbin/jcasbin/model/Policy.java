@@ -21,6 +21,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Policy represents the whole access control policy user defined.
+ */
 public class Policy {
     public Map<String, Map<String, Assertion>> model;
 
@@ -177,9 +180,31 @@ public class Policy {
      */
     public boolean addPolicy(String sec, String ptype, List<String> rule) {
         if (!hasPolicy(sec, ptype, rule)) {
-            model.get(sec).get(ptype).policy.add(rule);
+            Assertion assertion = model.get(sec).get(ptype);
+            List<List<String>> policy = assertion.policy;
+            int priorityIndex = assertion.priorityIndex;
+
+            // ensure the policies is ordered by priority value
+            if ("p".equals(sec) && priorityIndex >= 0) {
+                int value = Integer.parseInt(rule.get(priorityIndex));
+                int left = 0, right = policy.size();
+                // binary insert
+                while (left < right) {
+                    int mid = (left + right) >>> 1;
+                    if (value > Integer.parseInt(policy.get(mid).get(priorityIndex))) {
+                        left = mid + 1;
+                    } else {
+                        right = mid;
+                    }
+                }
+                policy.add(left, rule);
+            } else {
+                policy.add(rule);
+            }
+
             return true;
         }
+
         return false;
     }
 
